@@ -1,0 +1,129 @@
+// features/cart/cartSlice.js - Redux slice for cart state management
+// A Redux slice is a collection of Redux reducer logic and actions for a single feature.
+// This slice manages the shopping cart state including adding, removing, and updating items.
+// Redux Toolkit's createSlice automatically generates action creators and action types.
+
+import { createSlice } from "@reduxjs/toolkit"; // createSlice from Redux Toolkit
+
+// Helper function to load cart from localStorage
+// WHAT: Retrieves cart data from browser's localStorage
+// WHY: Persists cart across browser sessions - users don't lose their cart on refresh
+// HOW: JSON.parse converts stored string back to JavaScript array
+const loadCartFromStorage = () => {
+    try {
+        // Get the 'cart' item from localStorage
+        const serializedCart = localStorage.getItem("cart");
+
+        // If no cart exists, return empty array
+        if (!serializedCart) return [];
+
+        // Parse the JSON string back to an array
+        return JSON.parse(serializedCart);
+    } catch {
+        // If parsing fails (corrupted data), return empty array
+        return [];
+    }
+};
+
+// Helper function to save cart to localStorage
+// WHAT: Stores cart data in browser's localStorage
+// WHY: Ensures cart persists when user refreshes or closes browser
+// HOW: JSON.stringify converts array to string for storage
+const saveCartToStorage = (cart) => {
+    try {
+        // Store the cart array as a JSON string
+        localStorage.setItem("cart", JSON.stringify(cart));
+    } catch {
+        // If storage fails (quota exceeded, etc.), silently ignore
+        // Cart will still work in memory, just won't persist
+    }
+};
+
+// Initial state for the cart slice
+// WHAT: The starting state when the app loads
+// WHY: Provides default values for cart state
+// HOW: Loads persisted cart from localStorage
+const initialState = {
+    cartItems: loadCartFromStorage() // Array of cart items with quantities
+};
+
+// Create the cart slice using Redux Toolkit
+// WHAT: Defines the cart state structure and reducers
+// WHY: createSlice generates actions and reducer automatically
+const cartSlice = createSlice({
+    name: "cart", // Unique name for this slice (used in action types)
+    initialState, // Initial state defined above
+    reducers: {
+        // Action to add an item to the cart
+        // WHAT: Adds a product to cart or increases quantity if already exists
+        // WHY: Users need to add products to their shopping cart
+        // HOW: Checks if item exists, updates quantity or adds new item
+        addToCart: (state, action) => {
+            const item = action.payload; // The product object from the action
+
+            // Check if item already exists in cart
+            const exist = state.cartItems.find((x) => x._id === item._id);
+
+            if (exist) {
+                // If exists, increase quantity by 1
+                // Map through items, update the matching one
+                state.cartItems = state.cartItems.map((x) =>
+                    x._id === exist._id ? { ...x, qty: x.qty + 1 } : x
+                );
+            } else {
+                // If new item, add to cart with quantity 1
+                state.cartItems.push({ ...item, qty: 1 });
+            }
+
+            // Persist the updated cart to localStorage
+            saveCartToStorage(state.cartItems);
+        },
+
+        // Action to remove an item from the cart
+        // WHAT: Completely removes an item from the cart
+        // WHY: Users need to remove unwanted items
+        // HOW: Filters out the item with matching ID
+        removeFromCart: (state, action) => {
+            // action.payload is the product ID to remove
+            state.cartItems = state.cartItems.filter((x) => x._id !== action.payload);
+
+            // Persist the updated cart
+            saveCartToStorage(state.cartItems);
+        },
+
+        // Action to update the quantity of a cart item
+        // WHAT: Changes the quantity of a specific item in the cart
+        // WHY: Users need to adjust how many of each item they want
+        // HOW: Maps through items and updates the quantity for the matching ID
+        updateQuantity: (state, action) => {
+            const { id, qty } = action.payload; // id: product ID, qty: new quantity
+
+            // Update the quantity for the matching item
+            state.cartItems = state.cartItems.map((x) =>
+                x._id === id ? { ...x, qty } : x
+            );
+
+            // Persist the updated cart
+            saveCartToStorage(state.cartItems);
+        },
+
+        // Action to clear all items from the cart
+        // WHAT: Removes all items from the cart
+        // WHY: Users might want to start fresh or complete checkout
+        // HOW: Sets cartItems to empty array
+        clearCart: (state) => {
+            state.cartItems = [];
+
+            // Persist the empty cart
+            saveCartToStorage(state.cartItems);
+        }
+    }
+});
+
+// Export the action creators generated by createSlice
+// These are used by components to dispatch actions
+export const { addToCart, removeFromCart, updateQuantity, clearCart } = cartSlice.actions;
+
+// Export the reducer function
+// This is used in the store configuration
+export default cartSlice.reducer;
